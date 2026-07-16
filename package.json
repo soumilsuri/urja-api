@@ -6,8 +6,7 @@
   "main": "dist/server.js",
   "scripts": {
     "dev": "tsx src/server.ts",
-    "build": "echo 'Build skipped - @vercel/node handles TS natively'",
-    "build:local": "tsc",
+    "build": "tsc",
     "start": "node dist/server.js",
     "generate:openapi": "tsx src/scripts/generate-openapi.ts"
   },
@@ -31,6 +30,6 @@
   "devDependencies": {
     "@types/node": "^26.1.1",
     "tsx": "^4.23.1",
-    "typescript": "^7.0.2"
+    "typescript": "~5.8.0"
   }
 }
