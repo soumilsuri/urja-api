@@ -11,21 +11,15 @@ import { transformersRoutes } from "./api/routes/transformers.js";
 import { healthRoutes } from "./api/routes/health.js";
 import fastifyStatic from "@fastify/static";
 import { join } from "node:path";
+import { fileURLToPath } from "node:url";
 
-async function main() {
-  // ─── Initialize database ───────────────────────────────────────────────
-  await initDatabase();
-
-  // ─── Create Fastify app ────────────────────────────────────────────────
-  const app = Fastify({
-    logger: {
-      level: "info",
-      transport: {
-        target: "pino-pretty",
-        options: { translateTime: "HH:MM:ss", ignore: "pid,hostname" },
-      },
-    },
-  });
+/**
+ * Builds and configures the Fastify app instance.
+ * Exposes a helper function so the same setup can be run locally (listen)
+ * or inside serverless functions like Vercel (exported handler).
+ */
+export async function buildApp(opts = {}) {
+  const app = Fastify(opts);
 
   // ─── Static files / Dashboard UI ───────────────────────────────────────
   await app.register(fastifyStatic, {
@@ -64,7 +58,7 @@ async function main() {
         },
       ],
       tags: [
-        { name: "Meters", description: "Smart meter data — identity, hierarchy, geo, and energy consumption" },
+        { name: "Meters", description: "Smart meter data - identity, hierarchy, geo, and energy consumption" },
         { name: "Transformers", description: "Distribution transformer (DT) data" },
         { name: "System", description: "Health checks and administrative operations" },
       ],
@@ -92,7 +86,6 @@ async function main() {
 
   // ─── Auth middleware (skip for health, docs, and dashboard UI) ─────────
   app.addHook("onRequest", async (request, reply) => {
-    // Skip auth for health check, docs, OpenAPI spec, and frontend UI
     const publicPaths = [
       "/api/v1/health",
       "/docs",
@@ -102,7 +95,6 @@ async function main() {
       "/public"
     ];
     
-    // Also skip for root URL path (/)
     const isRoot = request.url === "/";
     const isPublic = isRoot || publicPaths.some((p) => request.url.startsWith(p));
 
@@ -131,7 +123,23 @@ async function main() {
     });
   });
 
-  // ─── Start server ─────────────────────────────────────────────────────
+  return app;
+}
+
+// ─── Self-start logic for local execution ──────────────────────────────────
+async function main() {
+  await initDatabase();
+
+  const app = await buildApp({
+    logger: {
+      level: "info",
+      transport: {
+        target: "pino-pretty",
+        options: { translateTime: "HH:MM:ss", ignore: "pid,hostname" },
+      },
+    },
+  });
+
   try {
     await app.listen({ port: config.api.port, host: "0.0.0.0" });
     console.log(`\n🚀 Urja API running at http://localhost:${config.api.port}`);
@@ -143,8 +151,7 @@ async function main() {
     process.exit(1);
   }
 
-  // ─── Initial sync from portal ─────────────────────────────────────────
-  // Run after server is listening so health check works during sync
+  // Initial sync from portal on boot
   try {
     console.log("[startup] Starting initial data sync from portal…");
     const result = await syncAll();
@@ -153,11 +160,21 @@ async function main() {
     );
   } catch (err) {
     console.error("[startup] Initial sync failed (service will serve cached data if available):", err);
-    // Don't exit — the service can still serve stale cached data
   }
 }
 
-main().catch((err) => {
-  console.error("Fatal error:", err);
-  process.exit(1);
-});
+// Check if running this script directly
+const isMain = process.argv[1] && (
+  process.argv[1] === fileURLToPath(import.meta.url) ||
+  process.argv[1].endsWith("src/server.ts") ||
+  process.argv[1].endsWith("src/server.js") ||
+  process.argv[1].endsWith("server.ts") ||
+  process.argv[1].endsWith("server.js")
+);
+
+if (isMain) {
+  main().catch((err) => {
+    console.error("Fatal error:", err);
+    process.exit(1);
+  });
+}
