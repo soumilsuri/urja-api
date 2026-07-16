@@ -31,7 +31,7 @@ export const config = {
     apiKey: apiKey,
   },
   db: {
-    path: process.env.DB_PATH || "./data/urja.db",
+    path: process.env.DB_PATH || (process.env.VERCEL ? "/tmp/urja.db" : "./data/urja.db"),
   },
   portalTimezoneOffset: process.env.PORTAL_TIMEZONE_OFFSET || "+05:30",
 };

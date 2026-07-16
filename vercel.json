@@ -1,9 +1,26 @@
 {
   "version": 2,
+  "functions": {
+    "api/server.ts": {
+      "includeFiles": "node_modules/sql.js/dist/**"
+    }
+  },
   "rewrites": [
     {
-      "source": "/(.*)",
+      "source": "/api/(.*)",
       "destination": "/api/server"
+    },
+    {
+      "source": "/docs(.*)",
+      "destination": "/api/server"
+    },
+    {
+      "source": "/dashboard",
+      "destination": "/public/index.html"
+    },
+    {
+      "source": "/(.*)",
+      "destination": "/public/$1"
     }
   ]
 }

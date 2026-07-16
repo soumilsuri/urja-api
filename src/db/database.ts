@@ -1,10 +1,19 @@
 import initSqlJs from "sql.js";
 import type { Database, QueryExecResult } from "sql.js";
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from "node:fs";
-import { dirname } from "node:path";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { config } from "../config.js";
 
 let db: Database;
+let isInMemoryOnly = false;
+
+// Resolve the absolute path to the sql.js wasm binary.
+// This is critical on Vercel where the working directory may differ from
+// where node_modules lives. We resolve it relative to this file's location.
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+const wasmPath = join(__dirname, "..", "..", "node_modules", "sql.js", "dist", "sql-wasm.wasm");
 
 /**
  * Initialize SQLite database (sql.js — pure JS, no native compilation).
@@ -12,20 +21,30 @@ let db: Database;
  * Loads from disk if it does.
  */
 export async function initDatabase(): Promise<void> {
-  const SQL = await initSqlJs();
-  const dbDir = dirname(config.db.path);
+  const SQL = await initSqlJs({
+    // Tell sql.js exactly where to find its wasm file regardless of cwd
+    locateFile: () => wasmPath,
+  });
 
-  if (!existsSync(dbDir)) {
-    mkdirSync(dbDir, { recursive: true });
-  }
+  try {
+    const dbDir = dirname(config.db.path);
 
-  if (existsSync(config.db.path)) {
-    const buffer = readFileSync(config.db.path);
-    db = new SQL.Database(buffer);
-    console.log(`[db] Loaded existing database from ${config.db.path}`);
-  } else {
+    if (!existsSync(dbDir)) {
+      mkdirSync(dbDir, { recursive: true });
+    }
+
+    if (existsSync(config.db.path)) {
+      const buffer = readFileSync(config.db.path);
+      db = new SQL.Database(buffer);
+      console.log(`[db] Loaded existing database from ${config.db.path}`);
+    } else {
+      db = new SQL.Database();
+      console.log(`[db] Created new database`);
+    }
+  } catch (err: any) {
+    console.warn(`[db] Failed to initialize file-backed database (${err.message}). Falling back to pure in-memory storage.`);
+    isInMemoryOnly = true;
     db = new SQL.Database();
-    console.log(`[db] Created new database`);
   }
 
   createSchema();
@@ -34,9 +53,17 @@ export async function initDatabase(): Promise<void> {
 
 /** Persist the in-memory database to disk */
 export function saveDatabase(): void {
-  const data = db.export();
-  const buffer = Buffer.from(data);
-  writeFileSync(config.db.path, buffer);
+  if (isInMemoryOnly) {
+    return;
+  }
+  try {
+    const data = db.export();
+    const buffer = Buffer.from(data);
+    writeFileSync(config.db.path, buffer);
+  } catch (err: any) {
+    console.warn(`[db] Failed to save database to disk (${err.message}). Switching to pure in-memory mode.`);
+    isInMemoryOnly = true;
+  }
 }
 
 /** Create tables if they don't exist */
