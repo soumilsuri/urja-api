@@ -1,0 +1,35 @@
+{
+  "name": "urja-api",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "A clean REST API service over the legacy Urja Meter Ops portal",
+  "main": "dist/server.js",
+  "scripts": {
+    "dev": "tsx src/server.ts",
+    "build": "tsc",
+    "start": "node dist/server.js",
+    "generate:openapi": "tsx src/scripts/generate-openapi.ts"
+  },
+  "keywords": [
+    "urja",
+    "smart-meter",
+    "api"
+  ],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@fastify/cors": "^11.3.0",
+    "@fastify/static": "^10.1.0",
+    "@fastify/swagger": "^9.8.1",
+    "@fastify/swagger-ui": "^6.1.0",
+    "dotenv": "^17.4.2",
+    "fastify": "^5.10.0",
+    "pino-pretty": "^13.1.3",
+    "sql.js": "^1.14.1"
+  },
+  "devDependencies": {
+    "@types/node": "^26.1.1",
+    "tsx": "^4.23.1",
+    "typescript": "^7.0.2"
+  }
+}
